@@ -6,7 +6,7 @@
 #include "include/adc_read.h"
 #include "include/ekf.h"
 #include "driver/spi_slave.h"
-
+#include "esp_timer.h"
 
 #define GPIO_MOSI 23
 #define GPIO_MISO 19
@@ -36,10 +36,12 @@ typedef struct {
 
 
 void adc_task(TimerHandle_t xTimer) {
+	int64_t start_time = esp_timer_get_time(); 
     int adc_val_5, adc_val_6, adc_val_7;
     double voltage;
     double temperature;
     double current;
+    double time;
 	sensor_data_t send_data;
 
     adc_oneshot_read(adc1_handle, ADC1_CH5, &adc_val_5);
@@ -60,11 +62,14 @@ void adc_task(TimerHandle_t xTimer) {
     send_data.current = current;
     send_data.soc = X[0][0];
     
+    int64_t end_time = esp_timer_get_time(); 
+    time = (end_time - start_time) / 1000000.0; 
+    
     if (xQueueSend(xQueue, &send_data, pdMS_TO_TICKS(100)) != pdPASS) {
         printf("Failed to send data to the queue!\n");
     }
-    
-    printf("Voltage: %lf, Temperature: %lf, Current: %lf, SoC:  %lf\n", voltage, temperature, current,X[0][0]);
+
+    printf("Voltage: %lf, Temperature: %lf, Current: %lf, SoC:  %lf\n Time: %lf\n", voltage, temperature, current,X[0][0],time);
 }
 
 
