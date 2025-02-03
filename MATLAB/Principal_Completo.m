@@ -1,5 +1,5 @@
 clc; clear; close all;
-Archivo = 'C:\Users\leost\Downloads\EKF\EKF_HPPC_20.mat'; %EKF_T2_20
+Archivo = '/home/leonardo/EKF/EKF_HPPC_20.mat'; %EKF_T2_20
 
 load(Archivo);
 

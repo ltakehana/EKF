@@ -2,14 +2,15 @@
 #include <math.h>
 #include "battery_model.h"
 
- double temp_lut[TEMP_COUNT] = {-5.00, 0.00, 10.00, 20.00, 30.00, 40.00, 50.00};
 
- double soc_lut[SOC_COUNT] = {
+double temp_lut[TEMP_COUNT] = {-5.00, 0.00, 10.00, 20.00, 30.00, 40.00, 50.00};
+
+double soc_lut[SOC_COUNT] = {
     0.00, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 
     0.80, 0.85, 0.90, 0.95, 1.00
 };
 
- double F_R0[TEMP_COUNT][SOC_COUNT] = {
+double F_R0[TEMP_COUNT][SOC_COUNT] = {
     {0.218014997383328, 0.170188793575381, 0.189014322145870, 0.206399935240328, 0.221246401786206,
      0.170737374280710, 0.172924167502551, 0.160273078591468, 0.165426689980338, 0.159004893697639,
      0.170669375136920, 0.194673271551785, 0.166920070423618, 0.175408243851610, 0.0352455859683125},
@@ -39,7 +40,7 @@
      0.0605981780878527, 0.0651735204905620, 0.0630383880399465, 0.0681836419254294, 0.172719546874795}
 };
 
- double F_R1[TEMP_COUNT][SOC_COUNT] = {
+double F_R1[TEMP_COUNT][SOC_COUNT] = {
     {0.0742447823755796, 0.00442088304955144, 0.0185415839955120, 0.0215596963404750, 0.0166604740643074,
      0.0172377000330578, 0.0117352080276359, 0.0222201300332516, 0.0252135141365362, 0.0258398786400494,
      0.0210503014971455, 0.0253679108841289, 0.0138433117369743, 0.0152742050988018, 0.491325679716491},
@@ -69,8 +70,7 @@
      0.0556966986146522, 0.127517683415660, 0.104162686621032, 0.169402031772242, 0.538373858039366}
 };
 
-
- double F_C1[TEMP_COUNT][SOC_COUNT] = {
+double F_C1[TEMP_COUNT][SOC_COUNT] = {
     {154.859111904332, 150.512864900896, 159.859411839016, 159.999892416687, 156.037395933619,
      25.7817763964077, 22.3504839192248, 100.837561164172, 141.757592510957, 159.942932590172,
      159.855804765479, 159.695521993706, 25.2896981344067, 32.8408824098650, 135.001755765634},
@@ -100,86 +100,59 @@
      15.2413581717301, 29.5987918547074, 28.7142877175909, 149.311346901119, 15.0957085739252}
 };
 
- double soc_ocv[7]={-8.81154966813426, 45.6795293452767, -80.8110807051082, 65.6851929821343, -26.1458381365314, 4.92798059505743, 2.91171833602983};
 
- double d_soc_ocv[6]={-52.8692980088056, 228.397646726384, -323.244322820433, 197.055578946403, -52.2916762730628, 4.92798059505743};
+double soc_ocv[7]={-8.811549668179980,45.679529345416600,-80.811080705268810,65.685192982219460,-26.145838136551845,4.927980595059218,2.911718336029812};
+
+double d_soc_ocv[6]={-52.869298009079884,2.283976467270830e+02,-3.232443228210752e+02,1.970555789466584e+02,-52.291676273103690,4.927980595059218};
 
 double interpolate(double x1, double y1, double x2, double y2, double x) {
     return y1 + ((y2 - y1) / (x2 - x1)) * (x - x1);
 }
 
+void find_nearest_neighbors(double T, double SOC, int *i1, int *i2, int *j1, int *j2) {
+    for (int i = 0; i < TEMP_COUNT - 1; i++) {
+        if (temp_lut[i] <= T && T < temp_lut[i + 1]) {
+            *i1 = i;
+            *i2 = i + 1;
+            break;
+        }
+    }
+    
+    for (int j = 0; j < SOC_COUNT - 1; j++) {
+        if (soc_lut[j] <= SOC && SOC < soc_lut[j + 1]) {
+            *j1 = j;
+            *j2 = j + 1;
+            break;
+        }
+    }
+}
+
+
 double find_value(double temperature, double soc, 
                    double *temp_vector,
                    double *soc_vector,
                    double values_lut[TEMP_COUNT][SOC_COUNT]) {
-    
-    int start, end, middle;
-    int previous_temp, next_temp;
-    int previous_soc, next_soc;
-    double lower_value, upper_value;
+    int i1 = 0, i2 = TEMP_COUNT - 1;
+    int j1 = 0, j2 = SOC_COUNT - 1;
 
-    if (temperature < temp_vector[0]) temperature = temp_vector[0];
-    if (temperature > temp_vector[TEMP_COUNT - 1]) temperature = temp_vector[TEMP_COUNT - 1];
-    if (soc < soc_vector[0]) soc = soc_vector[0];
-    if (soc > soc_vector[SOC_COUNT - 1]) soc = soc_vector[SOC_COUNT - 1];
+    find_nearest_neighbors(temperature, soc, &i1, &i2, &j1, &j2);
 
-    start = 0;
-    end = TEMP_COUNT - 1;
+    double T1 = temp_vector[i1], T2 = temp_vector[i2];
+    double SOC1 = soc_vector[j1], SOC2 = soc_vector[j2];
 
-    while (start <= end) {
-        middle = (start + end) / 2;
-        if (temp_vector[middle] == temperature) {
-            previous_temp = next_temp = middle;
-            break;
-        } else if (temp_vector[middle] < temperature) {
-            start = middle + 1;
-        } else {
-            end = middle - 1;
-        }
-    }
-    if(previous_temp!=next_temp){
-        previous_temp = end >= 0 ? end : 0;
-        next_temp = start < TEMP_COUNT ? start : TEMP_COUNT - 1;
-    }
+    double Q11 = values_lut[i1][j1]; 
+    double Q12 = values_lut[i1][j2]; 
+    double Q21 = values_lut[i2][j1]; 
+    double Q22 = values_lut[i2][j2]; 
 
-    start = 0;
-    end = SOC_COUNT - 1;
-    while (start <= end) {
-        middle = (start + end) / 2;
-        if (soc_vector[middle] == soc) {
-            previous_soc = next_soc = middle;
-            break;
-        } else if (soc_vector[middle] < soc) {
-            start = middle + 1;
-        } else {
-            end = middle - 1;
-        }
-    }
-    if(previous_soc!=next_soc){
-        previous_soc = end >= 0 ? end : 0;
-        next_soc = start < SOC_COUNT ? start : SOC_COUNT - 1;
-        lower_value = interpolate(
-            soc_vector[previous_soc], values_lut[previous_temp][previous_soc],
-            soc_vector[next_soc], values_lut[previous_temp][next_soc], soc
-        );
-        upper_value = interpolate(
-            soc_vector[previous_soc], values_lut[next_temp][previous_soc],
-            soc_vector[next_soc], values_lut[next_temp][next_soc], soc
-        );
-    }
-    else{
-        lower_value = values_lut[previous_temp][next_soc];
-        upper_value = values_lut[next_temp][next_soc];
-    }
-    
-    if(previous_temp==next_temp)
-        return lower_value;
+    double f_T1 = ((SOC2 - soc) / (SOC2 - SOC1)) * Q11 + ((soc - SOC1) / (SOC2 - SOC1)) * Q12;
+    double f_T2 = ((SOC2 - soc) / (SOC2 - SOC1)) * Q21 + ((soc - SOC1) / (SOC2 - SOC1)) * Q22;
+    double result = ((T2 - temperature) / (T2 - T1)) * f_T1 + ((temperature - T1) / (T2 - T1)) * f_T2;
 
-    return interpolate(
-        temp_vector[previous_temp], lower_value,
-        temp_vector[next_temp], upper_value, temperature
-    );
+    return result;
 }
+
+
 
 double polyval(double *coefficients, int num_coeffs, double x) {
     double result = 0.0;
@@ -191,8 +164,8 @@ double polyval(double *coefficients, int num_coeffs, double x) {
     return result;
 }
 
-void battery_model(double i, double V1, double T, double SOC, int Nc, 
-           double A[2][2], double b[1][2], double c[2][1], double *Vt) {
+void battery_model(double i, double V1, double T, double SOC, double Nc, 
+           double A[2][2], double b[2][1], double c[1][2], double *Vt) {
     
 
     double deltaT = 1;
@@ -227,9 +200,9 @@ void battery_model(double i, double V1, double T, double SOC, int Nc,
     A[1][1] = a1;
     
     b[0][0] = -(eta*deltaT/qn); 
-    b[0][1] = b1;
+    b[1][0] = b1;
     
     c[0][0] = dOCV;
-    c[1][0] = -1;
+    c[0][1] = -1;
     
 }

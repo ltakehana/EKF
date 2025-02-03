@@ -3,7 +3,7 @@ function [SOC_Estimated, Vt_Estimated, Vt_Error, P_history, KG_history] = EKF_SO
     load 'BattMod_T_1S_291024.mat'; %SE TIENE QUE CARGAR ASI PORQUE DA ERROR DE LA OTRA FORMA
     
     % MODIFICA PARA CARGAR LAS MATRICES DE COVARIANZA
-    Matrices = 'C:\Users\leost\Downloads\EKF\Matrices_HPPC_20G1.mat';
+    Matrices = '/home/leonardo/EKF/Matrices_HPPC_20G1.mat';
     
     load (Matrices);
     
@@ -41,15 +41,20 @@ function [SOC_Estimated, Vt_Estimated, Vt_Error, P_history, KG_history] = EKF_SO
         SOC = X(1);
         V1  = X(2);
         
-        [A,B,C,Vt] = Model(F_R0,F_R1,F_C1,dSOCOCV,SOCOCV,i,V1,T,SOC,Nc);
-    
+        %[A,B,C,Vt] = Model(F_R0,F_R1,F_C1,dSOCOCV,SOCOCV,i,V1,T,SOC,Nc);
+        [A,B,C,Vt] = mex_model(i,V1,T,SOC,Nc);
         % CALCULO DEL ERROR 
         Error_x   = Vcel - Vt;
         
     
-        [X, P] = Apriori(A, B, i, X, Q, P);
-        [X, P, KG] = Aposteriori(X, P, C, R, Error_x);
+        [X, P] = mex_priori(A, B, i, X, Q, P);
+            
+        X(1)=min(max(X(1),0),1);
+
+        [X, P, KG] = mex_posteriori(X, P, C, R, Error_x);
     
+        X(1)=min(max(X(1),0),1);
+        
         % ACTUALIZACION DEL SOC Y GUARDAR EN LOS VECTORES
         Vt_Estimated(k)  = Vt;
         SOC_Estimated(k) = X(1);
